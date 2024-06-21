@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "fastapi-suren"
+version = "0.1.0"
+description = ""
+authors = ["StRub <125211403+FrexRub@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.111.0"
+uvicorn = {extras = ["standart"], version = "^0.29.0"}
+pydantic-settings = "^2.2.1"
+sqlalchemy = {extras = ["asyncaio"], version = "^2.0.30"}
+aiosqlite = "^0.20.0"
+alembic = "^1.13.1"
+email-validator = "^2.1.1"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.4.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
