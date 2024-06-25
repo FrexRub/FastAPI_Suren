@@ -1,9 +1,11 @@
 import asyncio
-from core.models import db_helper, User, Profile, Post
+
 from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.engine import Result
 from sqlalchemy import select
+
+from core.models import db_helper, User, Profile, Post, Order, Product
 
 
 async def create_user(session: AsyncSession, username: str) -> User:
@@ -157,8 +159,70 @@ async def main_to_relations(session: AsyncSession):
     await get_profiles_with_users_and_users_with_posts(session=session)
 
 
+async def create_order(session: AsyncSession, promocode: str | None = None) -> Order:
+    order: Order = Order(promocode=promocode)
+    session.add(order)
+    await session.commit()
+    return order
+
+
+async def create_product(
+        session: AsyncSession,
+        name: str,
+        description: str,
+        price: int,
+) -> Product:
+    product: Product = Product(name=name, description=description, price=price)
+    session.add(product)
+    await session.commit()
+    return product
+
+
 async def demo_m2m(session: AsyncSession):
-    pass
+    order_one: Order = await create_order(session)
+    order_promo: Order = await create_order(session, promocode="promo")
+
+    mouse: Product = await create_product(
+        session,
+        name="Mouse",
+        description="Great gaming mouse",
+        price=123,
+    )
+    keyboard: Product = await create_product(
+        session,
+        name="Keyboard",
+        description="Great gaming keyboard",
+        price=149,
+    )
+    display: Product = await create_product(
+        session,
+        name="Display",
+        description="Office display",
+        price=299,
+    )
+
+    # Для добавления продуктов к ордеру необходимо подгрузить связи
+    order_one = await session.scalar(
+        select(Order).where(Order.id == order_one.id).
+        options(
+            selectinload(Order.products),
+        )
+    )
+
+    order_promo = await session.scalar(
+        select(Order).where(Order.id == order_promo.id).
+        options(
+            selectinload(Order.products),
+        )
+    )
+
+    order_one.products.append(mouse)
+    order_one.products.append(keyboard)
+    # order_promo.products.append(keyboard)
+    # order_promo.products.append(display)
+    order_promo.products = [keyboard, display]
+
+    await session.commit()
 
 
 async def main():
