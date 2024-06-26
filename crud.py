@@ -250,6 +250,24 @@ async def demo_m2m(session: AsyncSession):
     #         print("-", product.id, product.name, product.price)
 
     orders: list[Order] = await get_orders_with_products_assoc(session)
+    gift_product = await create_product(
+        session=session,
+        name="Gift",
+        description="Gift for yuo",
+        price=0,
+    )
+
+    # каждому ордеру добавляем товар-подарок
+    for order in orders:  # type: Order
+        order.products_details.append(
+            OrderProductAssociation(
+                count=1,
+                unit_price=0,
+                product=gift_product,
+            )
+        )
+    await session.commit()
+
     for order in orders:
         print(order.id, order.promocode, order.created_at, "products:")
         for order_product_details in order.products_details:  # type: OrderProductAssociation
