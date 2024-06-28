@@ -58,12 +58,12 @@ def get_auth_user_username(
 def get_username_by_static_auth_token(
         static_token: str = Header(alias="x-auth-token"),
 ) -> str:
-    if static_token not in static_auth_token_username:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"{static_token} token invalid",
-        )
-    return static_auth_token_username[static_token]
+    if username := static_auth_token_username.get(static_token):
+        return username
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail=f"token invalid",
+    )
 
 
 @router.get("/basic-auth-username/")
