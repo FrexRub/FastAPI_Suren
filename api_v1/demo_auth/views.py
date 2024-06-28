@@ -132,3 +132,17 @@ def demo_auth_check_cookie(
         "massage": f"hello, {username}",
         **user_session_data,
     }
+
+
+@router.get("/logout-cookie/")
+def demo_auth_logout_cookie(
+        response: Response,
+        session_id: str = Cookie(alias=COOKIE_SESSION_ID_KEY),
+        user_session_data: dict = Depends(get_session_data)
+):
+    COOKIES.pop(session_id)
+    response.delete_cookie(COOKIE_SESSION_ID_KEY)
+    username = user_session_data["username"]
+    return {
+        "massage": f"Bye, {username}",
+    }
