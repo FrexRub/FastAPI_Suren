@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Form, HTTPException, status
-
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jwt.exceptions import InvalidTokenError
 from pydantic import BaseModel
 
 from users.schemas import UserSchema
@@ -29,10 +30,12 @@ user_db: dict[str, UserSchema] = {
     sam.username: sam,
 }
 
+http_bearer = HTTPBearer()
+
 
 def validate_auth_user(
-    username: str = Form(),
-    password: str = Form(),
+        username: str = Form(),
+        password: str = Form(),
 ):
     unauthed_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -57,6 +60,44 @@ def validate_auth_user(
     return user
 
 
+def get_current_token_payload(
+        credentials: HTTPAuthorizationCredentials = Depends(http_bearer),
+) -> dict:
+    token = credentials.credentials
+    try:
+        payload = auth_utils.decode_jwt(token=token)
+    except InvalidTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"invalid token error exception: {exc}"
+        )
+    else:
+        return payload
+
+
+def get_current_auth_user(
+        payload: dict = Depends(get_current_token_payload),
+) -> UserSchema:
+    username: str = payload.get("sub")
+    if not (user := user_db.get(username)):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="token invalid"
+        )
+    return user
+
+
+def get_current_active_auth_user(
+        user: UserSchema = Depends(get_current_auth_user)
+):
+    if not user.active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="user inactive"
+        )
+    return user
+
+
 @router.post("/login", response_model=TokenInfo)
 def auth_user_issue_jwt(
         user: UserSchema = Depends(validate_auth_user),
@@ -71,3 +112,13 @@ def auth_user_issue_jwt(
         access_token=token,
         token_type="Bearer",
     )
+
+
+@router.get("/users/me/")
+def auth_user_check_self_info(
+        user: UserSchema = Depends(get_current_active_auth_user)
+):
+    return {
+        "username": user.username,
+        "email": user.email,
+    }
