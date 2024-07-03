@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Form, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import (HTTPBearer, HTTPAuthorizationCredentials,
+                              OAuth2PasswordBearer)
 from jwt.exceptions import InvalidTokenError
 from pydantic import BaseModel
 
@@ -30,7 +31,8 @@ user_db: dict[str, UserSchema] = {
     sam.username: sam,
 }
 
-http_bearer = HTTPBearer()
+# http_bearer = HTTPBearer()
+oauth2_schema = OAuth2PasswordBearer(tokenUrl="api/v1/jwt/login")
 
 
 def validate_auth_user(
@@ -61,9 +63,10 @@ def validate_auth_user(
 
 
 def get_current_token_payload(
-        credentials: HTTPAuthorizationCredentials = Depends(http_bearer),
+        token: str = Depends(oauth2_schema),
+        # credentials: HTTPAuthorizationCredentials = Depends(http_bearer),
 ) -> dict:
-    token = credentials.credentials
+    # token = credentials.credentials
     try:
         payload = auth_utils.decode_jwt(token=token)
     except InvalidTokenError as exc:
@@ -116,9 +119,12 @@ def auth_user_issue_jwt(
 
 @router.get("/users/me/")
 def auth_user_check_self_info(
+        payload: dict = Depends(get_current_token_payload),
         user: UserSchema = Depends(get_current_active_auth_user)
 ):
+    iat = payload.get("iat")
     return {
         "username": user.username,
         "email": user.email,
+        "login_in_at": iat,
     }
