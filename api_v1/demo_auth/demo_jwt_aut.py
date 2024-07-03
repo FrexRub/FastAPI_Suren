@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Form, HTTPException, status
 
 from pydantic import BaseModel
 
@@ -30,8 +30,31 @@ user_db: dict[str, UserSchema] = {
 }
 
 
-def validate_auth_user():
-    pass
+def validate_auth_user(
+    username: str = Form(),
+    password: str = Form(),
+):
+    unauthed_exc = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid username or password",
+    )
+
+    if not (user := user_db.get(username)):
+        raise unauthed_exc
+
+    if not auth_utils.validate_password(
+            password=password,
+            hashed_password=user.password,
+    ):
+        raise unauthed_exc
+
+    if not user.active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="user inactive"
+        )
+
+    return user
 
 
 @router.post("/login", response_model=TokenInfo)
