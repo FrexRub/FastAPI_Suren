@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends, Form, HTTPException, status
 from fastapi.security import (HTTPBearer, HTTPAuthorizationCredentials,
                               OAuth2PasswordBearer)
@@ -6,11 +8,13 @@ from pydantic import BaseModel
 
 from users.schemas import UserSchema
 from auth import utils as auth_utils
+from core.config import setting
 
 
 class TokenInfo(BaseModel):
     access_token: str
-    token_type: str
+    refresh_token: str
+    token_type: str = "Bearer"
 
 
 router = APIRouter(prefix="/jwt", tags=["JWT"])
@@ -101,19 +105,63 @@ def get_current_active_auth_user(
     return user
 
 
-@router.post("/login", response_model=TokenInfo)
-def auth_user_issue_jwt(
-        user: UserSchema = Depends(validate_auth_user),
-):
+def create_access_token(user: UserSchema) -> str:
     jwt_payload = {
         "sub": user.username,
         "username": user.username,
         "email": user.email,
     }
-    token = auth_utils.encode_jwt(jwt_payload)
+    token = create_jwt(
+        token_type=ACCESS_TOKEN_TYPE,
+        token_data=jwt_payload,
+        expire_minutes=setting.auth_jwt.access_token_expire_minutes,
+    )
+    return token
+
+
+TOKEN_TYPE_FIELD = "type"
+ACCESS_TOKEN_TYPE = "access"
+REFRESH_TOKEN_TYPE = "refresh"
+
+
+def create_jwt(
+        token_type: str,
+        token_data: dict,
+        expire_minutes: int = setting.auth_jwt.access_token_expire_minutes,
+        expire_timedelta: timedelta | None = None,
+) -> str:
+    jwt_payload = {TOKEN_TYPE_FIELD: token_type}
+    jwt_payload.update(token_data)
+    return auth_utils.encode_jwt(
+        payload=jwt_payload,
+        expire_minutes=expire_minutes,
+        expire_timedelta=expire_timedelta,
+    )
+
+
+def create_refresh_token(user: UserSchema) -> str:
+    jwt_payload = {
+        "sub": user.username,
+        "username": user.username,
+        "email": user.email,
+    }
+    token = create_jwt(
+        token_type=REFRESH_TOKEN_TYPE,
+        token_data=jwt_payload,
+        expire_timedelta=timedelta(days=setting.auth_jwt.refresh_token_expire_day)
+    )
+    return token
+
+
+@router.post("/login", response_model=TokenInfo)
+def auth_user_issue_jwt(
+        user: UserSchema = Depends(validate_auth_user),
+):
+    access_token = create_access_token(user)
+    refresh_token = create_refresh_token(user)
     return TokenInfo(
-        access_token=token,
-        token_type="Bearer",
+        access_token=access_token,
+        refresh_token=refresh_token,
     )
 
 
