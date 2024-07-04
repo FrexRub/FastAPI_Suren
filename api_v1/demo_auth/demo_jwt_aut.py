@@ -17,7 +17,14 @@ class TokenInfo(BaseModel):
     token_type: str = "Bearer"
 
 
-router = APIRouter(prefix="/jwt", tags=["JWT"])
+http_bearer = HTTPBearer(auto_error=False)
+oauth2_schema = OAuth2PasswordBearer(tokenUrl="api/v1/jwt/login")
+
+router = APIRouter(
+    prefix="/jwt",
+    tags=["JWT"],
+    dependencies=[Depends(http_bearer)]
+)
 
 john = UserSchema(
     username="john",
@@ -34,9 +41,6 @@ user_db: dict[str, UserSchema] = {
     john.username: john,
     sam.username: sam,
 }
-
-# http_bearer = HTTPBearer()
-oauth2_schema = OAuth2PasswordBearer(tokenUrl="api/v1/jwt/login")
 
 
 def validate_auth_user(
