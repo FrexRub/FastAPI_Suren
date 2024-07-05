@@ -13,7 +13,7 @@ from core.config import setting
 
 class TokenInfo(BaseModel):
     access_token: str
-    refresh_token: str
+    refresh_token: str | None = None
     token_type: str = "Bearer"
 
 
@@ -89,6 +89,30 @@ def get_current_token_payload(
 def get_current_auth_user(
         payload: dict = Depends(get_current_token_payload),
 ) -> UserSchema:
+    token_type: str = payload.get(TOKEN_TYPE_FIELD)
+    if token_type != ACCESS_TOKEN_TYPE:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"invalid token type {token_type!r} expected {ACCESS_TOKEN_TYPE}",
+        )
+    username: str = payload.get("sub")
+    if not (user := user_db.get(username)):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="token invalid"
+        )
+    return user
+
+
+def get_current_auth_user_for_refresh(
+        payload: dict = Depends(get_current_token_payload),
+) -> UserSchema:
+    token_type: str = payload.get(TOKEN_TYPE_FIELD)
+    if token_type != REFRESH_TOKEN_TYPE:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"invalid token type {token_type!r} expected {REFRESH_TOKEN_TYPE}",
+        )
     username: str = payload.get("sub")
     if not (user := user_db.get(username)):
         raise HTTPException(
@@ -180,3 +204,17 @@ def auth_user_check_self_info(
         "email": user.email,
         "login_in_at": iat,
     }
+
+
+@router.post(
+    "/refresh",
+    response_model=TokenInfo,
+    response_model_exclude_none=True,  # не выводит поля со значением None
+)
+def auth_refresh_jwt(
+        user: UserSchema = Depends(get_current_auth_user_for_refresh)
+):
+    access_token = create_access_token(user)
+    return TokenInfo(
+        access_token=access_token,
+    )

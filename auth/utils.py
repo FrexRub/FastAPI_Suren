@@ -1,3 +1,4 @@
+import uuid
 from datetime import timedelta, datetime
 
 import bcrypt
@@ -22,6 +23,7 @@ def encode_jwt(
     to_encode.update(
         exp=expire,  # время жизни токена
         iat=now,  # дата создания токена
+        jti=str(uuid.uuid4()), # ID token
     )
     encoded = jwt.encode(to_encode, private_key, algorithm=algorithm)
     return encoded
